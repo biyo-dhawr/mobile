@@ -1,4 +1,4 @@
-export const API_URL = 'http://192.168.1.94:4000/api';
+export const API_URL = 'http://192.168.8.109:4000/api';
 
 export async function apiRequest(path, options = {}) {
   try {
@@ -45,7 +45,7 @@ export async function getWaterSources(villageId) {
 }
 
 // Submit a public report
-export async function submitPublicReport(villageId, waterSourceId, content) {
+export async function submitPublicReport(villageId, waterSourceId, content, sourceStatus, sourceWaterLevel) {
   return await apiRequest('/reports/submit/public', {
     method: 'POST',
     body: JSON.stringify({
@@ -53,6 +53,8 @@ export async function submitPublicReport(villageId, waterSourceId, content) {
       waterSourceId,
       content,
       reporterType: 'App',
+      sourceStatus,
+      sourceWaterLevel,
     }),
   });
 }

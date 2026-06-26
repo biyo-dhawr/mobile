@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -21,30 +21,33 @@ import {
 // ─── USSD step constants ──────────────────────────────────────────────────────
 const STEPS = {
   MAIN_MENU: 'MAIN_MENU',
-  // Status flow
-  STATUS_REGION: 'STATUS_REGION',
-  STATUS_DISTRICT: 'STATUS_DISTRICT',
-  STATUS_VILLAGE: 'STATUS_VILLAGE',
-  SHOW_STATUS: 'SHOW_STATUS',
-  // Report flow
-  REPORT_REGION: 'REPORT_REGION',
   REPORT_DISTRICT: 'REPORT_DISTRICT',
   REPORT_VILLAGE: 'REPORT_VILLAGE',
   REPORT_SOURCE: 'REPORT_SOURCE',
   REPORT_ISSUE: 'REPORT_ISSUE',
-  // Results
   SUCCESS: 'SUCCESS',
   ERROR: 'ERROR',
 };
 
+// Deegaannada la oggol yahay — ID-yada backend-ka laga soo qaadaa
+const ALLOWED_REGIONS = ['Borama', 'Baki', 'Saylac'];
+
 export default function USSDMenuScreen({ onClose }) {
-  const [step, setStep] = useState(STEPS.MAIN_MENU);
+  const [step, setStep] = useState(STEPS.REPORT_DISTRICT);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [reportResponse, setReportResponse] = useState(null);
+
+  // Regions (filtered from backend — ID-yada saxda ah)
+  const [deegaanno, setDeegaanno] = useState([]);
+  const [regionsLoading, setRegionsLoading] = useState(true);
+
+  // Dropdown state
+  const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState(null);
 
   // Data lists
-  const [regions, setRegions] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [villages, setVillages] = useState([]);
   const [waterSources, setWaterSources] = useState([]);
@@ -52,6 +55,24 @@ export default function USSDMenuScreen({ onClose }) {
   // Selected IDs
   const [selectedVillageId, setSelectedVillageId] = useState(null);
   const [selectedSourceId, setSelectedSourceId] = useState(null);
+
+  // ─── Load regions to find Awdal, then load its districts ───────────────────────────
+  useEffect(() => {
+    setLoading(true);
+    getRegions()
+      .then(async (regions) => {
+        // Find Awdal region dynamically to ensure we have the correct ID
+        const awdal = regions.find(r => r.name.toLowerCase().includes('awdal'));
+        const regionId = awdal ? awdal.id : 1;
+        const districtData = await getDistricts(regionId);
+        setDistricts(districtData);
+      })
+      .catch((err) => {
+        setErrorMsg(err.message || 'Cilad ayaa dhacday');
+        setStep(STEPS.ERROR);
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
   const doFetch = useCallback(async (fn, setter, nextStep) => {
@@ -68,93 +89,51 @@ export default function USSDMenuScreen({ onClose }) {
     }
   }, []);
 
+  // ─── Handle region selection from dropdown ───────────────────────────────────
+  const handleRegionSelect = useCallback(
+    (region) => {
+      setSelectedRegion(region);
+      setRegionDropdownOpen(false);
+      doFetch(
+        () => getDistricts(region.id),
+        setDistricts,
+        STEPS.REPORT_DISTRICT,
+      );
+    },
+    [doFetch],
+  );
+
   // ─── Handler: user selects an option ────────────────────────────────────────
   const handleSelect = useCallback(
     async (item) => {
       switch (step) {
-        // ── Main menu ──────────────────────────────────────────────────────────
-        case STEPS.MAIN_MENU:
-          if (item.key === '1') {
-            doFetch(getRegions, setRegions, STEPS.STATUS_REGION);
-          } else if (item.key === '2') {
-            doFetch(getRegions, setRegions, STEPS.REPORT_REGION);
-          }
-          break;
-
-        // ── Status: region → district ──────────────────────────────────────────
-        case STEPS.STATUS_REGION:
-          doFetch(
-            () => getDistricts(item.id),
-            setDistricts,
-            STEPS.STATUS_DISTRICT,
-          );
-          break;
-
-        // ── Status: district → village ─────────────────────────────────────────
-        case STEPS.STATUS_DISTRICT:
-          doFetch(
-            () => getVillages(item.id),
-            setVillages,
-            STEPS.STATUS_VILLAGE,
-          );
-          break;
-
-        // ── Status: village → show water sources status ────────────────────────
-        case STEPS.STATUS_VILLAGE:
-          setSelectedVillageId(item.id);
-          doFetch(
-            () => getWaterSources(item.id),
-            setWaterSources,
-            STEPS.SHOW_STATUS,
-          );
-          break;
-
-        // ── Report: region → district ──────────────────────────────────────────
-        case STEPS.REPORT_REGION:
-          doFetch(
-            () => getDistricts(item.id),
-            setDistricts,
-            STEPS.REPORT_DISTRICT,
-          );
-          break;
-
-        // ── Report: district → village ─────────────────────────────────────────
         case STEPS.REPORT_DISTRICT:
-          doFetch(
-            () => getVillages(item.id),
-            setVillages,
-            STEPS.REPORT_VILLAGE,
-          );
+          doFetch(() => getVillages(item.id), setVillages, STEPS.REPORT_VILLAGE);
           break;
 
-        // ── Report: village → water source ─────────────────────────────────────
         case STEPS.REPORT_VILLAGE:
           setSelectedVillageId(item.id);
-          doFetch(
-            () => getWaterSources(item.id),
-            setWaterSources,
-            STEPS.REPORT_SOURCE,
-          );
+          doFetch(() => getWaterSources(item.id), setWaterSources, STEPS.REPORT_SOURCE);
           break;
 
-        // ── Report: water source → issue type ──────────────────────────────────
         case STEPS.REPORT_SOURCE:
           setSelectedSourceId(item.id);
           setStep(STEPS.REPORT_ISSUE);
           break;
 
-        // ── Report: issue type → submit ─────────────────────────────────────────
         case STEPS.REPORT_ISSUE: {
-          const content =
-            item.key === '1'
-              ? 'Ceelku wuu jabay / shaqaynayo' + ' (USSD Report)'
-              : 'Ceelku wuu maran yahay / biyaha ayaa dhacay (USSD Report)';
+          const isBroken = item.key === '1';
+          const content = isBroken
+            ? 'ceelka ma shaqaynayo waa jaban yahay'
+            : 'ceelka waa maran yahay waa biyo la\'aan';
+          const sourceStatus = isBroken ? 'Broken' : 'Needed Maintenance';
+          const sourceWaterLevel = isBroken ? null : 0;
+          
           setLoading(true);
           try {
-            await submitPublicReport(selectedVillageId, selectedSourceId, content);
-            setSuccessMsg(
-              'Warbixintaadu si guul leh ayay ugu gudbisay.\nMahadsanid, waxaad ka caawisay bulshada!',
-            );
+            const response = await submitPublicReport(selectedVillageId, selectedSourceId, content, sourceStatus, sourceWaterLevel);
+            setReportResponse(response);
+            setSuccessMsg('Waa la gudbiyey cabashadaada, mahadsanid');
             setStep(STEPS.SUCCESS);
           } catch (err) {
             setErrorMsg(err.message || 'Gudbinta waxay ku guul-daraysatay');
@@ -177,28 +156,17 @@ export default function USSDMenuScreen({ onClose }) {
     switch (step) {
       case STEPS.MAIN_MENU:
         return {
-          title: '★ OGAAL USSD *999# ★',
-          subtitle: 'Dooro fursad:',
-          items: [
-            { key: '1', label: 'Hubi xaaladda biyaha tuuladaada' },
-            { key: '2', label: 'Soo sheeg ceel jabay ama maran' },
-          ],
+          title: '★ Biyo-dhowr *999# ★',
+          subtitle: 'Dooro Deegaankaaga:',
+          items: [],
+          showRegionDropdown: true,
         };
-      case STEPS.STATUS_REGION:
-      case STEPS.REPORT_REGION:
-        return {
-          title: step === STEPS.STATUS_REGION ? 'Xaaladda Biyaha' : 'Soo Sheeg Cillad',
-          subtitle: 'Dooro Gobolkaaga:',
-          items: regions.map((r, i) => ({ key: String(i + 1), label: r.name, id: r.id })),
-        };
-      case STEPS.STATUS_DISTRICT:
       case STEPS.REPORT_DISTRICT:
         return {
           title: 'Degmada',
           subtitle: 'Dooro Degmadaada:',
           items: districts.map((d, i) => ({ key: String(i + 1), label: d.name, id: d.id })),
         };
-      case STEPS.STATUS_VILLAGE:
       case STEPS.REPORT_VILLAGE:
         return {
           title: 'Tuulada',
@@ -220,63 +188,20 @@ export default function USSDMenuScreen({ onClose }) {
           title: 'Nooca Cillada',
           subtitle: 'Maxaa ceelka ka haya?',
           items: [
-            { key: '1', label: 'Ceelku ma shaqaynayo / wuu jabay' },
-            { key: '2', label: 'Ceelku wuu maran yahay / biyaha ayaa dhacay' },
+            { key: '1', label: 'ceelka ma shaqaynayo waa jaban yahay' },
+            { key: '2', label: 'ceelka waa maran yahay waa biyo la\'aan' },
           ],
         };
-      case STEPS.SHOW_STATUS:
-        return {
-          title: 'Xaaladda Biyaha',
-          subtitle: null,
-          items: [],
-          statusList: waterSources,
-        };
       case STEPS.SUCCESS:
-        return { title: '✓ Guul!', subtitle: successMsg, items: [] };
+        return { title: '✓ Guul!', subtitle: successMsg, items: [], report: reportResponse };
       case STEPS.ERROR:
         return { title: '✗ Cilad', subtitle: errorMsg, items: [] };
       default:
         return { title: '', subtitle: '', items: [] };
     }
-  }, [step, regions, districts, villages, waterSources, successMsg, errorMsg]);
+  }, [step, districts, villages, waterSources, successMsg, errorMsg]);
 
-  // ─── Status colour helper ────────────────────────────────────────────────────
-  const statusColor = (s) => {
-    if (!s) return '#90a4ae';
-    const lower = s.toLowerCase();
-    if (lower === 'working') return '#00e676';
-    if (lower === 'broken') return '#ff5252';
-    if (lower === 'needed maintenance') return '#ffab40';
-    return '#90a4ae';
-  };
-
-  const statusLabel = (s, waterLevel) => {
-    if (!s) return 'Aan la garanayn';
-    const lower = s.toLowerCase();
-    // Check if water level indicates empty well
-    const level = typeof waterLevel === 'number' ? waterLevel : null;
-    if (lower === 'working') {
-      if (level !== null && level <= 10) return 'Biyaha ayaa dhamaaday (maran) ⚠';
-      return 'Waa fiican yahay ✓';
-    }
-    if (lower === 'broken') return 'Wuu jabay / ma shaqaynayo ✗';
-    if (lower === 'needed maintenance') return 'Daryeel ayuu u baahan yahay ⚠';
-    return s;
-  };
-
-  const waterLevelColor = (level) => {
-    if (level === null || level === undefined) return '#546e7a';
-    if (level > 60) return '#00e676';
-    if (level > 30) return '#ffab40';
-    return '#ff5252';
-  };
-
-  // ─── Render ──────────────────────────────────────────────────────────────────
   const menu = getMenuData();
-  const isTerminal =
-    step === STEPS.SUCCESS ||
-    step === STEPS.ERROR ||
-    step === STEPS.SHOW_STATUS;
 
   return (
     <Modal
@@ -295,77 +220,87 @@ export default function USSDMenuScreen({ onClose }) {
             </View>
 
             {/* ── Body ── */}
-            <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+            <ScrollView
+              style={styles.body}
+              contentContainerStyle={styles.bodyContent}
+              keyboardShouldPersistTaps="handled"
+            >
               {loading ? (
                 <View style={styles.loadingBox}>
-                  <ActivityIndicator size="large" color="#00e5ff" />
+                  <ActivityIndicator size="large" color="#1428A0" />
                   <Text style={styles.loadingText}>Fadlan sug...</Text>
                 </View>
               ) : (
                 <>
-                  {/* Subtitle / description */}
+                  {/* Subtitle */}
                   {menu.subtitle ? (
                     <Text style={styles.subtitle}>{menu.subtitle}</Text>
                   ) : null}
 
-                  {/* Status list (special case) */}
-                  {step === STEPS.SHOW_STATUS && (
-                    <>
-                      {waterSources.length === 0 ? (
-                        <Text style={styles.emptyText}>
-                          Ma jiraan ceelal diiwaangashan tuuladan.
-                        </Text>
+                  {/* ── Region Dropdown (Main Menu only) ── */}
+                  {menu.showRegionDropdown && (
+                    <View style={styles.dropdownWrapper}>
+                      {regionsLoading ? (
+                        <View style={styles.regionsLoadingBox}>
+                          <ActivityIndicator size="small" color="#1428A0" />
+                          <Text style={styles.regionsLoadingText}>
+                            Deegaannada waa la soo qaadayaa...
+                          </Text>
+                        </View>
                       ) : (
-                        waterSources.map((src) => (
-                          <View key={src.id} style={styles.statusRow}>
-                            <View style={styles.sourceHeader}>
-                              <Text style={styles.sourceName}>{src.name}</Text>
-                              <Text style={styles.sourceType}>{src.type}</Text>
-                            </View>
-
-                            {/* Status badge */}
-                            <View
+                        <>
+                          {/* Dropdown Button */}
+                          <TouchableOpacity
+                            style={[
+                              styles.dropdownBtn,
+                              regionDropdownOpen && styles.dropdownBtnOpen,
+                            ]}
+                            onPress={() => setRegionDropdownOpen((v) => !v)}
+                            activeOpacity={0.8}
+                          >
+                            <Text
                               style={[
-                                styles.statusBadge,
-                                { backgroundColor: statusColor(src.status) + '20', borderColor: statusColor(src.status) + '60', borderWidth: 1 },
+                                styles.dropdownBtnText,
+                                !selectedRegion && styles.dropdownPlaceholder,
                               ]}
                             >
-                              <Text
-                                style={[
-                                  styles.statusBadgeText,
-                                  { color: statusColor(src.status) },
-                                ]}
-                              >
-                                {statusLabel(src.status, src.waterLevel)}
-                              </Text>
-                            </View>
+                              {selectedRegion ? selectedRegion.name : 'Dooro Deegaanka...'}
+                            </Text>
+                            <Text style={styles.dropdownArrow}>
+                              {regionDropdownOpen ? '▲' : '▼'}
+                            </Text>
+                          </TouchableOpacity>
 
-                            {/* Water level bar */}
-                            {src.waterLevel !== null && src.waterLevel !== undefined && (
-                              <View style={styles.waterLevelBox}>
-                                <View style={styles.waterLevelLabelRow}>
-                                  <Text style={styles.waterLevelLabel}>Heerka Biyaha</Text>
-                                  <Text style={[styles.waterLevelPct, { color: waterLevelColor(src.waterLevel) }]}>
-                                    {src.waterLevel}%
-                                  </Text>
-                                </View>
-                                <View style={styles.waterLevelTrack}>
-                                  <View
+                          {/* Dropdown List */}
+                          {regionDropdownOpen && (
+                            <View style={styles.dropdownList}>
+                              {deegaanno.map((region, idx) => (
+                                <TouchableOpacity
+                                  key={region.id}
+                                  style={[
+                                    styles.dropdownItem,
+                                    idx === deegaanno.length - 1 && styles.dropdownItemLast,
+                                    selectedRegion?.id === region.id && styles.dropdownItemActive,
+                                  ]}
+                                  onPress={() => handleRegionSelect(region)}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={styles.dropdownItemDot} />
+                                  <Text
                                     style={[
-                                      styles.waterLevelFill,
-                                      {
-                                        width: `${Math.max(2, src.waterLevel)}%`,
-                                        backgroundColor: waterLevelColor(src.waterLevel),
-                                      },
+                                      styles.dropdownItemText,
+                                      selectedRegion?.id === region.id && styles.dropdownItemTextActive,
                                     ]}
-                                  />
-                                </View>
-                              </View>
-                            )}
-                          </View>
-                        ))
+                                  >
+                                    {region.name}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </>
                       )}
-                    </>
+                    </View>
                   )}
 
                   {/* Selectable option items */}
@@ -382,6 +317,8 @@ export default function USSDMenuScreen({ onClose }) {
                       <Text style={styles.optionLabel}>{item.label}</Text>
                     </TouchableOpacity>
                   ))}
+
+                  {/* ── Report Response Card (Removed per user request) ── */}
                 </>
               )}
             </ScrollView>
@@ -403,7 +340,7 @@ export default function USSDMenuScreen({ onClose }) {
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     padding: 16,
     paddingBottom: Platform.OS === 'android' ? 50 : 34,
@@ -413,41 +350,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dialog: {
-    backgroundColor: '#1a1a2e',
-    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
     overflow: 'hidden',
     maxHeight: '90%',
     borderWidth: 1,
-    borderColor: '#00e5ff33',
+    borderColor: '#d0d5e8',
+    shadowColor: '#1428A0',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
   },
   // Header
   header: {
-    backgroundColor: '#16213e',
-    paddingVertical: 14,
+    backgroundColor: '#1428A0',
+    paddingVertical: 16,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#00e5ff33',
     alignItems: 'center',
   },
   headerTitle: {
-    color: '#00e5ff',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 1,
   },
   // Body
   body: {
-    maxHeight: 420,
+    maxHeight: 460,
   },
   bodyContent: {
-    padding: 16,
-    paddingBottom: 8,
+    padding: 18,
+    paddingBottom: 10,
   },
   subtitle: {
-    color: '#b0bec5',
-    fontSize: 13,
+    color: '#3a3a5c',
+    fontSize: 14,
     marginBottom: 14,
     lineHeight: 20,
+    fontWeight: '600',
   },
   // Loading
   loadingBox: {
@@ -456,98 +397,242 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   loadingText: {
-    color: '#b0bec5',
+    color: '#6e7a8a',
     fontSize: 15,
     marginTop: 10,
+  },
+  // Regions loading/error
+  regionsLoadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#f5f6fa',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d0d5e8',
+  },
+  regionsLoadingText: {
+    color: '#6e7a8a',
+    fontSize: 14,
+  },
+  regionsErrorBox: {
+    alignItems: 'center',
+    paddingVertical: 18,
+    gap: 10,
+  },
+  regionsErrorText: {
+    color: '#e53935',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    backgroundColor: '#e8ecf8',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#1428A0',
+  },
+  retryBtnText: {
+    color: '#1428A0',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  // ── Dropdown ─────────────────────────────────────────────────────────────────
+  dropdownWrapper: {
+    marginBottom: 10,
+    zIndex: 99,
+  },
+  dropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f6fa',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: '#1428A0',
+    justifyContent: 'space-between',
+  },
+  dropdownBtnOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomColor: '#d0d5e8',
+  },
+  dropdownBtnText: {
+    color: '#1428A0',
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+  },
+  dropdownPlaceholder: {
+    color: '#a0aab8',
+    fontWeight: '400',
+  },
+  dropdownArrow: {
+    color: '#1428A0',
+    fontSize: 12,
+    marginLeft: 8,
+  },
+  dropdownList: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderTopWidth: 0,
+    borderColor: '#1428A0',
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#1428A0',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f2f8',
+    gap: 10,
+  },
+  dropdownItemLast: {
+    borderBottomWidth: 0,
+  },
+  dropdownItemActive: {
+    backgroundColor: '#e8ecf8',
+  },
+  dropdownItemDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#1428A0',
+    opacity: 0.5,
+  },
+  dropdownItemText: {
+    color: '#1a1a2e',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  dropdownItemTextActive: {
+    color: '#1428A0',
+    fontWeight: '700',
+  },
+  emptyDropdown: {
+    color: '#a0aab8',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  // Regions loading
+  regionsLoadingBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#f5f6fa',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d0d5e8',
+  },
+  regionsLoadingText: {
+    color: '#6e7a8a',
+    fontSize: 14,
   },
   // Option rows
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#16213e',
+    backgroundColor: '#f5f6fa',
     borderRadius: 10,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#d0d5e8',
     gap: 12,
   },
   optionBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#00e5ff22',
-    borderWidth: 1,
-    borderColor: '#00e5ff',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#1428A0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   optionBadgeText: {
-    color: '#00e5ff',
+    color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
   },
   optionLabel: {
-    color: '#e0e0e0',
+    color: '#1a1a2e',
     fontSize: 14,
     flex: 1,
     lineHeight: 20,
-  },
-  // Status rows
-  statusRow: {
-    backgroundColor: '#16213e',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#0f3460',
-  },
-  sourceName: {
-    color: '#e0e0e0',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  sourceType: {
-    color: '#78909c',
-    fontSize: 12,
-    marginTop: 2,
-    marginBottom: 8,
-  },
-  statusBadge: {
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-  statusBadgeText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  emptyText: {
-    color: '#78909c',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 20,
-    lineHeight: 22,
   },
   // Footer
   footer: {
     padding: 14,
     borderTopWidth: 1,
-    borderTopColor: '#0f3460',
+    borderTopColor: '#e8ecf8',
     alignItems: 'flex-end',
+    backgroundColor: '#fafbff',
   },
   cancelBtn: {
-    backgroundColor: '#ff525222',
+    backgroundColor: '#fff0f0',
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderWidth: 1,
-    borderColor: '#ff5252',
+    borderColor: '#e53935',
   },
   cancelBtnText: {
-    color: '#ff5252',
+    color: '#e53935',
     fontWeight: '600',
     fontSize: 14,
+  },
+  // ── Report card (backend response) ───────────────────────────────────────────
+  reportCard: {
+    marginTop: 14,
+    backgroundColor: '#f0f4ff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#c5d0f0',
+    overflow: 'hidden',
+  },
+  reportCardTitle: {
+    backgroundColor: '#1428A0',
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    letterSpacing: 0.5,
+  },
+  reportRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dde4f5',
+    gap: 8,
+  },
+  reportKey: {
+    color: '#5a6a9a',
+    fontSize: 12,
+    fontWeight: '600',
+    width: 100,
+    flexShrink: 0,
+  },
+  reportVal: {
+    color: '#1a1a2e',
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
   },
 });

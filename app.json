@@ -1,7 +1,13 @@
 {
   "expo": {
-    "name": "Ogaal USSD",
-    "slug": "ogaal-ussd-app",
+    "name": "Biyo Dhowr",
+    "slug": "biyo-dhowr",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "version": "1.0.0",
     "sdkVersion": "54.0.0",
     "orientation": "portrait",

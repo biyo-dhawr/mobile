@@ -28,11 +28,11 @@ export default function DialerScreen({ onDial }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a0a1a" />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
       {/* ── Header ── */}
       <View style={styles.header}>
-        <Text style={styles.headerLabel}>OGAAL</Text>
+        <Text style={styles.headerLabel}>Biyo-dhowr</Text>
         <Text style={styles.headerSub}>Nidaamka Biyaha Reer Miyi</Text>
       </View>
 
@@ -89,7 +89,7 @@ export default function DialerScreen({ onDial }) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: '#0a0a1a',
+    backgroundColor: '#ffffff',
     paddingBottom: Platform.OS === 'android' ? 30 : 0,
   },
   // Header
@@ -99,13 +99,13 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   headerLabel: {
-    color: '#00e5ff',
+    color: '#1428A0',
     fontSize: 28,
     fontWeight: '800',
     letterSpacing: 6,
   },
   headerSub: {
-    color: '#546e7a',
+    color: '#6e7a8a',
     fontSize: 12,
     marginTop: 4,
     letterSpacing: 1,
@@ -117,24 +117,29 @@ const styles = StyleSheet.create({
     marginHorizontal: 30,
     marginTop: 30,
     marginBottom: 6,
-    backgroundColor: '#16213e',
+    backgroundColor: '#f5f6fa',
     borderRadius: 14,
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#00e5ff33',
+    borderColor: '#d0d5e8',
     minHeight: 60,
+    shadowColor: '#1428A0',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   displayText: {
     flex: 1,
-    color: '#00e5ff',
+    color: '#1428A0',
     fontSize: 28,
     fontWeight: '700',
     letterSpacing: 3,
     textAlign: 'center',
   },
   placeholder: {
-    color: '#37474f',
+    color: '#b0b8c8',
     fontSize: 18,
     fontWeight: '400',
     letterSpacing: 1,
@@ -143,13 +148,13 @@ const styles = StyleSheet.create({
     padding: 6,
   },
   deleteIcon: {
-    color: '#ff5252',
+    color: '#e53935',
     fontSize: 20,
   },
   // Hint
   hint: {
     textAlign: 'center',
-    color: '#37474f',
+    color: '#a0aab8',
     fontSize: 12,
     marginBottom: 24,
     letterSpacing: 0.5,
@@ -167,19 +172,19 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#16213e',
+    backgroundColor: '#f5f6fa',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#0f3460',
+    borderColor: '#d0d5e8',
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: '#1428A0',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
   },
   keyLabel: {
-    color: '#e0e0e0',
+    color: '#1a1a2e',
     fontSize: 26,
     fontWeight: '600',
   },
@@ -192,19 +197,19 @@ const styles = StyleSheet.create({
   callBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#00897b',
+    backgroundColor: '#1428A0',
     paddingHorizontal: 40,
     paddingVertical: 18,
     borderRadius: 40,
     gap: 10,
     elevation: 5,
-    shadowColor: '#00897b',
+    shadowColor: '#1428A0',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.4,
     shadowRadius: 8,
   },
   callBtnDisabled: {
-    backgroundColor: '#1c3035',
+    backgroundColor: '#d0d5e8',
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -212,7 +217,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   callLabel: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 1,
