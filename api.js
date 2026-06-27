@@ -40,7 +40,7 @@ export async function getVillages(districtId) {
 
 // Fetch water sources for a specific village
 export async function getWaterSources(villageId) {
-  const result = await apiRequest(`/water-sources?villageId=${villageId}&limit=20`);
+  const result = await apiRequest(`/water-sources?villageId=${villageId}&limit=100`);
   return result.data || [];
 }
 
