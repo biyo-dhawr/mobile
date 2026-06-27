@@ -151,6 +151,23 @@ export default function USSDMenuScreen({ onClose }) {
     [step, selectedVillageId, selectedSourceId, doFetch, onClose],
   );
 
+  // ─── Handle Go Back ─────────────────────────────────────────────────────────
+  const handleBack = useCallback(() => {
+    switch (step) {
+      case STEPS.REPORT_VILLAGE:
+        setStep(STEPS.REPORT_DISTRICT);
+        break;
+      case STEPS.REPORT_SOURCE:
+        setStep(STEPS.REPORT_VILLAGE);
+        break;
+      case STEPS.REPORT_ISSUE:
+        setStep(STEPS.REPORT_SOURCE);
+        break;
+      default:
+        break;
+    }
+  }, [step]);
+
   // ─── Build menu items for each step ─────────────────────────────────────────
   const getMenuData = useCallback(() => {
     switch (step) {
@@ -325,6 +342,11 @@ export default function USSDMenuScreen({ onClose }) {
 
             {/* ── Footer ── */}
             <View style={styles.footer}>
+              {step !== STEPS.REPORT_DISTRICT && step !== STEPS.SUCCESS && step !== STEPS.ERROR && step !== STEPS.MAIN_MENU ? (
+                <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
+                  <Text style={styles.backBtnText}>← Dib u noqo</Text>
+                </TouchableOpacity>
+              ) : <View />}
               <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
                 <Text style={styles.cancelBtnText}>✕  Xir</Text>
               </TouchableOpacity>
@@ -579,8 +601,23 @@ const styles = StyleSheet.create({
     padding: 14,
     borderTopWidth: 1,
     borderTopColor: '#e8ecf8',
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     backgroundColor: '#fafbff',
+  },
+  backBtn: {
+    backgroundColor: '#e8ecf8',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#1428A0',
+  },
+  backBtnText: {
+    color: '#1428A0',
+    fontWeight: '600',
+    fontSize: 14,
   },
   cancelBtn: {
     backgroundColor: '#fff0f0',
